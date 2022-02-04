@@ -8,6 +8,15 @@ FROM drug
 SELECT *
 FROM prescription
 
+SELECT *
+FROM cbsa
+
+SELECT *
+FROM fips_county
+
+SELECT *
+FROM population
+
 --QUESTION 1A: answer: 1881634483 and 99707 work below
 
 select npi, nppes_provider_last_org_name,SUM(total_claim_count) as all_drugs
@@ -32,6 +41,7 @@ FROM
 	 AS doc_script_npi	 
 group by npi, name_and_specialty
 order by all_drugs desc
+LIMIT 1
 
 --question 2 a: family practice
 select specialty_description,SUM(total_claim_count) as all_drugs
@@ -44,6 +54,7 @@ FROM
 	 AS doc_script_npi	 
 group by specialty_description
 order by all_drugs desc
+
 
 ---question 2 b: Nurse Practitioner
 
@@ -75,3 +86,98 @@ FROM
 	 AS doc_script_npi_drug 
 group by specialty_description, opioid_drug_flag
 order by all_drugs desc
+
+SELECT generic_name, total_drug_cost
+FROM prescription
+LEFT JOIN drug
+USING (drug_name)
+order by total_drug_cost DESC
+limit 1
+
+---3a above, pirfenidone
+
+SELECT generic_name, total_drug_cost/total_day_supply as cost_per_day
+FROM prescription
+LEFT JOIN drug
+USING (drug_name)
+order by cost_per_day DESC
+limit 1
+--- 3b Immun glob (IGG)/gly/iga ova 50 7141.11
+
+SELECT drug_name,
+	case when opioid_drug_flag= 'Y' then  'opioid'
+		 when antibiotic_drug_flag= 'Y' then 'antibiotic' 
+		 Else 'neither' end
+		 as drug_type
+FROM drug
+full join prescription
+using (drug_name)
+order by drug_type
+---------
+SELECT Sum(total_drug_cost:: MONEY),
+	case when opioid_drug_flag= 'Y' then  'opioid'
+		 when antibiotic_drug_flag= 'Y' then 'antibiotic' 
+		 Else 'neither' end
+		 as drug_type
+FROM drug
+full join prescription
+using (drug_name)
+group by opioid_drug_flag, antibiotic_drug_flag
+order by Sum(total_drug_cost:: MONEY)
+----- opioids----question 4a and b above
+
+select*
+from cbsa
+full join fips_county
+using(fipscounty)
+full join population
+using (fipscounty)
+where state = 'TN'
+-----
+
+select count(distinct cbsa)
+from cbsa
+full join fips_county
+using(fipscounty)
+where state = 'TN'
+---question 5a: 10
+
+select distinct cbsa, sum(population)
+from cbsa
+full join fips_county
+using(fipscounty)
+full join population
+using (fipscounty)
+where state = 'TN'
+group by distinct cbsa
+order by sum(population)
+
+---question 5b 34100 has the fewest 34980 at 116352 has the most 183410
+
+select distinct cbsa, sum(population), county
+from cbsa
+full join fips_county
+using(fipscounty)
+full join population
+using (fipscounty)
+where state = 'TN'
+
+group by distinct cbsa, county
+order by sum(population)
+---sevier at 95523
+
+select drug_name, total_claim_count
+from prescription
+where total_claim_count> 3000
+-------------------
+SELECT drug_name, total_claim_count, nppes_provider_first_name, nppes_provider_last_org_name,
+	case when opioid_drug_flag= 'Y' then  'opioid'
+		 Else 'neither' end
+		 as drug_type
+FROM drug
+full join prescription
+using (drug_name)
+full join prescriber
+using (npi)
+where total_claim_count> 3000
+order by drug_type DESC
