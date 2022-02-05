@@ -85,16 +85,25 @@ FROM
 	 on p1.drug_name = drug.drug_name)
 	 AS doc_script_npi_drug 
 group by specialty_description, opioid_drug_flag
-order by all_drugs desc
+having sum(total_claim_count) is null
 
-SELECT generic_name, total_drug_cost
+
+----------------
+SELECT generic_name, total_drug_cost:: MONEY
 FROM prescription
 LEFT JOIN drug
 USING (drug_name)
-order by total_drug_cost DESC
+order by total_drug_cost:: MONEY DESC
 limit 1
-
----3a above, pirfenidone
+---or
+SELECT generic_name, SUM(total_drug_cost:: MONEY)
+FROM prescription
+LEFT JOIN drug
+USING (drug_name)
+GROUP BY generic_name
+order by SUM(total_drug_cost:: MONEY) DESC
+limit 1
+---3a above, pirfenidone or insulin
 
 SELECT generic_name, total_drug_cost/total_day_supply as cost_per_day
 FROM prescription
@@ -124,7 +133,7 @@ full join prescription
 using (drug_name)
 group by opioid_drug_flag, antibiotic_drug_flag
 order by Sum(total_drug_cost:: MONEY)
------ opioids----question 4a and b above
+----- neither, then opioids, then antibiotics----question 4a and b above
 
 select*
 from cbsa
@@ -161,9 +170,9 @@ using(fipscounty)
 full join population
 using (fipscounty)
 where state = 'TN'
-
+AND cbsa is null
 group by distinct cbsa, county
-order by sum(population)
+order by sum(population) desc
 ---sevier at 95523
 
 select drug_name, total_claim_count
@@ -181,3 +190,34 @@ full join prescriber
 using (npi)
 where total_claim_count> 3000
 order by drug_type DESC
+
+------------------------
+---Below Question 7
+
+
+
+SELECT p2.npi,
+	d.drug_name,
+	COALESCE(total_claim_count, 0)
+FROM prescriber AS p2
+CROSS JOIN drug AS d
+LEFT JOIN prescription AS p1
+  ON p1.npi = p2.npi
+  AND d.drug_name = p1.drug_name
+where p2.nppes_provider_city = 'NASHVILLE'
+AND p2.specialty_description= 'Pain Management'
+and opioid_drug_flag= 'Y'
+order by  npi
+
+------------------PART 2-------------
+SELECT count(npi)
+FROM prescriber
+FULL JOIN prescription
+USING (npi)
+---660516
+SELECT count(npi)
+FROM prescription
+LEFT JOIN prescriber
+USING (npi)
+
+
